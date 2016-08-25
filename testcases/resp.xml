@@ -1,0 +1,1 @@
+<?xml version='1.0' encoding='UTF-8'?><importSummary xmlns="http://dhis2.org/schema/dxf/2.0" responseType="ImportSummary"><status>SUCCESS</status><description>Import process completed successfully</description><importCount imported="5" updated="13" ignored="8" deleted="1"/><dataSetComplete>2016-08-10</dataSetComplete></importSummary>

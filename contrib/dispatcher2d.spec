@@ -1,0 +1,96 @@
+%define name dispatcher2d
+%define version 2.1
+%define release 1
+%define license GoodCitizen
+%define group System/Applications
+%define summary Data Exchange Middleware
+%define summary_www Data Exchange Middleware web administration console
+
+Name: %{name}
+Version: %{version}
+Release: %{release}
+License: %{license}
+Group: %{group}
+Prefix: %{_prefix}
+Source: %{name}-%{version}.tar.gz
+Summary: %{summary}
+Requires: postgresql-server, postgresql-contrib, libxslt, libxml2, openssl, kannel, unzip
+BuildRequires: postgresql-devel, libxslt-devel, libxml2-devel, openssl-devel
+BuildRoot: /var/tmp/%{name}-%{version}-%{release}
+Prefix: /usr
+
+%description
+Data Exchange Middleware. This application acts a data exchange middleware that enhances interoprability
+
+%package www
+Summary: %{summary_www}
+Group: %{group}
+Prefix: /srv
+Requires: lynx, dispatcher2d
+%description www
+A dispatcher2 web administration console. Allows web based administration.
+
+%prep
+%setup
+
+%build
+./configure --prefix=/usr
+
+%install
+make DESTDIR="$RPM_BUILD_ROOT" install
+mkdir -p ${RPM_BUILD_ROOT}/etc/dispatcher2d
+mkdir -p ${RPM_BUILD_ROOT}/etc/sysconfig
+mkdir -p ${RPM_BUILD_ROOT}/etc/init.d
+mkdir -p ${RPM_BUILD_ROOT}/usr/sbin
+mkdir -p ${RPM_BUILD_ROOT}/etc/cron.d
+mkdir -p ${RPM_BUILD_ROOT}/var/log/dispatcher2
+mkdir -p ${RPM_BUILD_ROOT}/srv/www/htdocs
+cp -f doc/dispatcher2.conf ${RPM_BUILD_ROOT}/etc/dispatcher2/dispatcher2d.conf
+cp -f contrib/%{name}.init ${RPM_BUILD_ROOT}/etc/init.d/%{name}
+cp -f contrib/%{name}.sysconfig ${RPM_BUILD_ROOT}/etc/sysconfig/%{name}
+cp -r web ${RPM_BUILD_ROOT}/srv/www/htdocs/dispatcher2
+cp -f contrib/fix_pghba.sh ${RPM_BUILD_ROOT}/usr/sbin/%{name}_fix_pghba.sh
+cp -f contrib/fix_postgresql.sh ${RPM_BUILD_ROOT}/usr/sbin/%{name}_fix_postgresql.sh
+
+%post
+if [ "$1" = 1 ];
+then
+	ln -sf /etc/init.d/dispatcher2d /usr/sbin/rcdispatcher2d
+	#/etc/init.d/postgresql restart
+	useradd dispatcher2
+
+	/usr/sbin/%{name}_fix_postgresql.sh
+        /usr/sbin/%{name}_fix_pghba.sh
+
+	/etc/init.d/postgresql restart
+
+	chkconfig dispatcher2 on
+fi
+
+%preun
+if [ "$1" = 0 ];
+then
+	/usr/sbin/rcdispatcher2d stop
+	chkconfig dispatcher2d off
+fi
+
+%postun
+if [ "$1" = 0 ];
+then
+	rm /usr/sbin/rcdispatcher2d
+	userdel dispatcher2
+	cp -f /var/lib/pgsql/data/pg_hba.conf.pre_dispatcher2 /var/lib/pgsql/data/pg_hba.conf
+	/etc/init.d/postgresql reload
+fi
+
+%files
+%doc AUTHORS README NEWS TODO COPYING
+%doc doc/dispatcher2.conf
+%config /etc/init.d/dispatcher2d
+%config(noreplace) /etc/dispatcher2/dispatcher2.conf
+%config(noreplace) /etc/sysconfig/dispatcher2d
+/var
+/usr
+
+%files www
+/srv/www/htdocs/dispatcher2
