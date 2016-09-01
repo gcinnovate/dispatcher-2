@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% from 'layout.html' import navbar2, myscripts, err %}
 
-{% block title %}dispacher2.::.Home{% endblock%}
+{% block title %}dispatcher-2.1.::.Home{% endblock%}
 {% block nav %}
     {% call navbar2() %}
         {% if ses.loggedin %}
@@ -27,7 +27,7 @@
 {% block content %}
     {{ err(ses.logon_err) }}
     {{ err(err_msg)}}
-    <h4>This is a management web interface for all the queued mTrac data submissions for DHIS2<br/></h4>
+    <h4>This is a management web interface for Data Exchange Middleware<br/></h4>
     <p>The interface shows all queued requests and has separate dashboards for:
         <ul>
             <li>List of all  queued submissions -> <a href="/requests">All Submissions</a></li>
@@ -40,8 +40,8 @@
     <p>Each failed submission request has some "statuscode" indicating the reason for failure. The following are the different status codes and their corresponding meanings:
     <ul>
         <li><b>ERROR1</b> Means that the queued request has a blank body for the XML request</li>
-        <li><b>ERROR2</b> Means that after posting XML request to DHIS2 server, the server returned an empty respose</li>
-        <li><b>ERROR3</b> Means that dispacher2 failed to parse the response returned by DHIS2 server</li>
+        <li><b>ERROR2</b> Means that after posting XML request to Destination App/Server, the server returned an empty respose</li>
+        <li><b>ERROR3</b> Means that dispatcher-2.1 failed to parse the response returned by Destination App/server</li>
         <li><b>ERROR4</b> Means that there was a problem while queuing this submission</li>
     </ul>
     </p>

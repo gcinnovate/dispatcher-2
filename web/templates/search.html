@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}dispacher2.::.Ready{% endblock%}
+{% block title %}dispatcher-2.1.::.Ready{% endblock%}
 {% from 'layout.html' import navbar2, myscripts, err %}
 
 {% block nav %}
@@ -31,6 +31,19 @@
             <tr><td>Request Body Has:</td><td><input name="request_body" value="" type="text" class=""/></td></tr>
             <tr><td>Creation Date: Start</td><td><input name="sdate" type="text" placeholder="YYYY-MM-DD" class=""/>
                     &nbsp; End <input type="text" name="edate" placeholder="YYYY-MM-DD"/></td></tr>
+            <tr><td>Source App/Server</td><td><select name="year">
+                    <option value="">Select Source</option>
+                    {% for y in servers%}
+                        <option value="{{ y.id }}">{{ y.name }}</option>
+                    {% endfor %}
+                </select> &nbsp; Destination App/Server
+                    <select>
+                    <option value="">Select Destination</option>
+                    {% for y in servers2 %}
+                        <option value="{{ y.id }}">{{ y.name }}</option>
+                    {% endfor %}
+                </select>
+            </td></tr>
             <tr><td>Status</td><td><select name="status">
                     <option value="">Select Status</option>
                     <option value="canceled">Canceled</option>

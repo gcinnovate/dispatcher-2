@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% from 'layout.html' import navbar2, myscripts, err %}
 
-{% block title %}dispacher2.::.Home{% endblock%}
+{% block title %}dispatcher-2.1.::.Home{% endblock%}
 {% block nav %}
     {% call navbar2() %}
         {% if ses.loggedin %}
@@ -28,8 +28,8 @@
     {{ err(ses.logon_err) }}
     {{ err(err_msg)}}
     <div>
-        <h3>What is dispacher2?</h3>
-        <p>dispacher2 is a..</p>
+        <h3>What is dispatcher-2.1?</h3>
+        <p>dispatcher-2.1 is a..</p>
     </div>
 {% endblock %}
 

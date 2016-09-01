@@ -10,11 +10,14 @@ import logging
 # import time
 # from datetime import datetime
 # from datetime import timedelta
+import parsedatetime
 from web.contrib.template import render_jinja
 
 filedir = os.path.dirname(__file__)
 sys.path.append(os.path.join(filedir))
 from pagination import doquery, getPaginationString, countquery
+
+cal = parsedatetime.Calendar()
 
 
 class AppURLopener(urllib.FancyURLopener):
@@ -23,14 +26,14 @@ class AppURLopener(urllib.FancyURLopener):
 urllib._urlopener = AppURLopener()
 
 logging.basicConfig(
-    #format='%(asctime)s:%(levelname)s:%(message)s', filename='/var/log/dispatcher/dispatcher2-web.log',
+    # format='%(asctime)s:%(levelname)s:%(message)s', filename='/var/log/dispatcher/dispatcher2-web.log',
     format='%(asctime)s:%(levelname)s:%(message)s', filename='/tmp/dispatcher2-web.log',
     datefmt='%Y-%m-%d %I:%M:%S', level=logging.DEBUG
 )
 
 # DB confs
 db_host = 'localhost'
-db_name = 'skytools'
+db_name = 'dispatcher2'
 db_user = 'postgres'
 db_passwd = 'postgres'
 
@@ -188,7 +191,7 @@ class Failed:
 
         dic = lit(
             relations='requests', fields="*",
-            criteria="status='failed' AND created > '%s' AND xml_is_well_formed(request_body)" % (amonthAgo),
+            criteria="status='failed' AND created > '%s' AND xml_is_well_formed(body)" % (amonthAgo),
             order="id desc",
             limit=limit, offset=start)
         res = doquery(db, dic)
@@ -228,7 +231,7 @@ class Failed:
 
         dic = lit(
             relations='requests', fields="*",
-            criteria="status='failed' AND created > '%s' AND xml_is_well_formed(request_body)" % (amonthAgo),
+            criteria="status='failed' AND created > '%s' AND xml_is_well_formed(body)" % (amonthAgo),
             order="id desc",
             limit=limit, offset=start)
         res = doquery(db, dic)
@@ -318,6 +321,10 @@ class Search:
         limit = SETTINGS['PAGE_LIMIT']
         start = (page - 1) * limit if page > 0 else 0
 
+        dic = lit(relations='servers', fields="*", criteria="", order="id desc", limit=limit, offset=start)
+        servers = doquery(db, dic)
+        servers2 = doquery(db, dic)
+
         dic = lit(
             relations='requests', fields="*",
             criteria=session.criteria,
@@ -334,7 +341,7 @@ class Search:
 
     def POST(self):
         params = web.input(
-            page=1, reqid=[], submissionid="", request_body="", sdate="", edate="",
+            page=1, reqid=[], submissionid="", body="", sdate="", edate="",
             status="", year="", week="", pbtn="")
         try:
             page = int(params.page)
@@ -366,13 +373,13 @@ class Search:
             criteria += " AND created <= '%s'" % params.edate
         if params.week:
             criteria += " AND week = '%s'" % params.week
-        if params.request_body:
-            criteria += " AND request_body ILIKE '%%%s%%'" % params.request_body
+        if params.body:
+            criteria += " AND body ILIKE '%%%s%%'" % params.body
         if params.year:
             criteria += " AND year = '%s'" % params.year
         if params.formatting:
             if params.formatting == "xml":
-                criteria += " AND xml_is_well_formed(request_body)"
+                criteria += " AND xml_is_well_formed(body)"
 
         print criteria
         if len(criteria) > 5:
