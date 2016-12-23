@@ -23,6 +23,7 @@ struct dispatcher2conf {
     char logdir[128];
     int max_retries;
     double request_process_interval;
+    int use_global_submission_period;
     int start_submission_period;
     int end_submission_period;
 };

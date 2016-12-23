@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
     gwlib_init();
 
     printf("Dispatcher2 v%s (Build %s).\n"
-            "(c) 2016, GoodCitizen Ltd, All Rights Reserved.\n",
+            "(c) 2016, GoodCitizen Co. Ltd, All Rights Reserved.\n",
             VERSION, DISPATCHER2_BUILD_VERSION);
 
      strncpy(conffile, DISPATCHER2CONF, sizeof(conffile));

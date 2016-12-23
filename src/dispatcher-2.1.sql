@@ -8,16 +8,27 @@ CREATE TABLE servers(
     auth_method text NOT NULL DEFAULT '',
     use_ssl BOOLEAN NOT NULL DEFAULT 'f', --whether ssl is enabled for this server/app
     ssl_client_certkey_file TEXT NOT NULL DEFAULT '',
-    offpeak_start INTEGER NOT NULL DEFAULT 0, -- starting hour for off peak period
-    offpeak_end INTEGER NOT NULL DEFAULT 1, -- ending hour for off peak period
+    start_submission_period INTEGER NOT NULL DEFAULT 0, -- starting hour for submission period
+    end_submission_period INTEGER NOT NULL DEFAULT 23, -- ending hour for submission period
+    xml_response_xpath TEXT NOT NULL DEFAULT '',
+    json_response_jsonpath TEXT NOT NULL DEFAULT '',
     created timestamptz DEFAULT current_timestamp,
     updated timestamptz DEFAULT current_timestamp
 );
 
+CREATE TABLE server_allowed_sources(
+    id serial PRIMARY KEY NOT NULL,
+    server_id INTEGER NOT NULL REFERENCES servers(id),
+    allowed_sources INTEGER[] NOT NULL DEFAULT ARRAY[]::INTEGER[],
+    created timestamptz DEFAULT current_timestamp,
+    updated timestamptz DEFAULT current_timestamp
+);
+
+
 CREATE TABLE requests(
     id bigserial PRIMARY KEY NOT NULL,
     source INTEGER REFERENCES servers(id), -- source app/server
-    destination INTEGER REFERENCES servers(id), -- source app/server
+    destination INTEGER REFERENCES servers(id), -- destination app/server
     body TEXT NOT NULL DEFAULT '',
     ctype TEXT NOT NULL DEFAULT '',
     status VARCHAR(32) NOT NULL DEFAULT 'ready' CHECK( status IN('ready', 'inprogress', 'failed', 'error', 'expired', 'completed')),
@@ -91,6 +102,30 @@ CREATE TABLE users (
     updated timestamptz DEFAULT current_timestamp
 
 );
+
+-- FUNCTIONS
+-- Check if source is an allowed "source" for destination server/app dest
+CREATE OR REPLACE FUNCTION is_allowed_source(source integer, dest integer) RETURNS BOOLEAN AS $delim$
+    DECLARE
+     t boolean;
+    BEGIN
+        select source = ANY(allowed_sources) INTO t FROM server_allowed_sources WHERE server_id = dest;
+        RETURN t;
+    END;
+$delim$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION in_submission_period(server_id integer) RETURNS BOOLEAN AS $delim$
+    DECLARE
+    t boolean;
+    BEGIN
+       SELECT
+        to_char(current_timestamp, 'HH24')::int >= start_submission_period
+        AND
+        to_char(current_timestamp, 'HH24')::int <= end_submission_period INTO t
+        FROM servers WHERE id = server_id;
+        RETURN t;
+    END;
+$delim$ LANGUAGE plpgsql;
 
 -- Data Follows
 INSERT INTO user_roles(user_role, descr)

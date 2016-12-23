@@ -96,7 +96,9 @@ static int conf_init(dispatcher2conf_t config)
     config->http_port = 9090;
     config->max_retries = MAX_BATCH_RETRIES;
     config->request_process_interval = 1; /*  default. */
+    config->use_ssl = 0;
 
+    config->use_global_submission_period = 1;
     config->start_submission_period = 7;
     config->end_submission_period = 22;
 
@@ -176,6 +178,8 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
             case 'u':
                 if (strcasecmp(field, "user") == 0)
                     snprintf(config->dbuser, sizeof config->dbuser, "%s", value);
+                else if (strcasecmp(field, "use-global-submission-period") == 0)
+                    config->use_global_submission_period = atoi(value);
 #ifdef HAVE_LIBSSL
                 else if (strcasecmp(field, "use-ssl") == 0)
                     config->use_ssl = (strcasecmp(value, "true") == 0);

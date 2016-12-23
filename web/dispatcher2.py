@@ -19,9 +19,8 @@ from pagination import doquery, getPaginationString, countquery
 
 cal = parsedatetime.Calendar()
 
-
 class AppURLopener(urllib.FancyURLopener):
-    version = "dispatcher2 /1.0"
+    version = "dispatcher-2.1"
 
 urllib._urlopener = AppURLopener()
 

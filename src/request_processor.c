@@ -79,7 +79,7 @@ static xmlChar *findvalue(xmlDocPtr doc, xmlChar *xpath, int add_namespace){
     return value;
 }
 
-#define REQUEST_SQL "SELECT id FROM requests WHERE status = 'ready'"
+#define REQUEST_SQL "SELECT id FROM requests WHERE status = 'ready' AND is_allowed_source(source, destination)"
 
 static void init_request_processor_sql(PGconn *c)
 {
@@ -93,13 +93,64 @@ static void init_request_processor_sql(PGconn *c)
 
 static List *req_list; /* Of Request id */
 static Dict *req_dict; /* For keeping list short*/
+static Dict *server_dict;
+
+void free_serverconf(serverconf_t *d)
+{
+    if (!d)
+        return;
+    octstr_destroy(d->name);
+    octstr_destroy(d->username);
+    octstr_destroy(d->password);
+    octstr_destroy(d->ipaddress);
+    octstr_destroy(d->url);
+    octstr_destroy(d->auth_method);
+    octstr_destroy(d->ssl_client_certkey_file);
+    gw_free(d);
+}
+
+static void load_serverconf_dict(PGconn *c)
+{
+    char buf[128], *s;
+    PGresult *r;
+    int i, n;
+    if (!c)
+        return;
+    server_dict = dict_create(17, (void *)free_serverconf);
+
+    sprintf(buf, "SELECT * FROM servers");
+
+    r = PQexec(c, buf);
+    n = (PQresultStatus(r) == PGRES_TUPLES_OK) ? PQntuples(r) : 0;
+    for (i=0; i<n; i++) {
+        info(0, "We got here XXX!");
+        serverconf_t *server = gw_malloc(sizeof *server);
+        server->server_id = (s = PQgetvalue(r, i, PQfnumber(r, "id"))) != NULL ? strtoul(s, NULL, 10) : 0;
+        Octstr *xkey = octstr_format("%s", s);
+
+        server->name = octstr_create(PQgetvalue(r, i, PQfnumber(r, "name")));
+        server->username = octstr_create(PQgetvalue(r, i, PQfnumber(r, "username")));
+        server->password = octstr_create(PQgetvalue(r, i, PQfnumber(r, "password")));
+        server->ipaddress = octstr_create(PQgetvalue(r, i, PQfnumber(r, "ipaddress")));
+        server->url = octstr_create(PQgetvalue(r, i, PQfnumber(r, "url")));
+        server->auth_method = octstr_create(PQgetvalue(r, i, PQfnumber(r, "auth_method")));
+        server->ssl_client_certkey_file = octstr_create(PQgetvalue(r, i, PQfnumber(r, "ssl_client_certkey_file")));
+        server->use_ssl = (s = PQgetvalue(r, i, PQfnumber(r, "id"))) != NULL ? strtoull(s, NULL, 10) : 0;
+        server->start_submission_period = (s = PQgetvalue(r, i,
+                    PQfnumber(r, "start_submission_period"))) != NULL ? strtoul(s, NULL, 10) : 0;
+        server->end_submission_period = (s = PQgetvalue(r, i,
+                    PQfnumber(r, "end_submission_period"))) != NULL ? strtoul(s, NULL, 10) : 0;
+
+        dict_put(server_dict, xkey, server);
+        octstr_destroy(xkey);
+    }
+    PQclear(r);
+    return;
+}
 
 /* Post XML to server using basic auth and return response */
-static Octstr *post_xmldata_to_server(PGconn *c, int serverid, Octstr *data) {
-    PGresult *r;
-    char tmp[64], *x;
+static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *dest) {
     Octstr *url = NULL, *user = NULL, *passwd = NULL;
-    const char *pvals[] = {tmp};
     HTTPCaller *caller;
 
     List *request_headers;
@@ -107,32 +158,16 @@ static Octstr *post_xmldata_to_server(PGconn *c, int serverid, Octstr *data) {
     int method = HTTP_METHOD_POST;
     int status = -1;
 
-
-    sprintf(tmp, "%d", serverid);
-    r = PQexecParams(c,
-            "SELECT username, password, url FROM servers WHERE id = $1",
-            1, NULL, pvals, NULL, NULL, 0);
-
-    if (PQresultStatus(r) != PGRES_TUPLES_OK || PQntuples(r) <=0) {
-        PQclear(r);
-        return NULL;
-    }
-
-    x = PQgetvalue(r, 0, 0);
-    user = (x && x[0]) ? octstr_create(x) : NULL;
-    x = PQgetvalue(r, 0, 1);
-    passwd = (x && x[0]) ? octstr_create(x) : NULL;
-    x = PQgetvalue(r, 0, 2);
-    url = (x && x[0]) ? octstr_create(x) : NULL;
-    PQclear(r);
-
     /*  request_headers = http_create_empty_headers();*/
     request_headers = gwlist_create();
     http_header_add(request_headers, "Content-Type", "text/xml");
-    http_add_basic_auth(request_headers, user, passwd);
-
+    http_add_basic_auth(request_headers, dest->username, dest->password);
+    /* XXX Add SSL stuff here */
+    if (dest->use_ssl){
+        info(0, "Client Will now use SSL to post data!");
+    }
     caller = http_caller_create();
-    http_start_request(caller, method, url, request_headers, data, 1, NULL, NULL);
+    http_start_request(caller, method, dest->url, request_headers, data, 1, NULL, NULL);
     http_receive_result_real(caller, &status, &furl, &request_headers, &rbody, 1);
 
     http_caller_destroy(caller);
@@ -154,17 +189,17 @@ static void do_request(PGconn *c, int64_t rid) {
     char tmp[64] = {0}, *cmd, *x, buf[256] = {0}, st[64] = {0};
     PGresult *r;
     int retries, serverid, source;
-    /* int64_t submissionid; */
     Octstr *data;
     const char *pvals[] = {tmp, st, buf};
-    Octstr *resp;
+    Octstr *resp, *xkey;
     xmlDocPtr doc;
     xmlChar *s, *im, *ig, *up;
 
     sprintf(tmp, "%ld", rid);
 
     /* NOWAIT forces failure if the record is locked. Also we do not process if not yet time.*/
-    cmd = "SELECT source, destination, body, retries, submissionid FROM requests WHERE id = $1 FOR UPDATE NOWAIT";
+    cmd = "SELECT source, destination, body, retries, in_submission_period(destination), ctype "
+        "FROM requests WHERE id = $1 FOR UPDATE NOWAIT";
 
     r = PQexecParams(c, cmd, 1, NULL, pvals, NULL, NULL, 0);
     if (PQresultStatus(r) != PGRES_TUPLES_OK || PQntuples(r) <= 0) {
@@ -173,6 +208,11 @@ static void do_request(PGconn *c, int64_t rid) {
         return;
     }
 
+    if ((x = PQgetvalue(r, 0, 4)) && strcmp(x, "f") == 0) {
+        /* We're out of submission period */
+        info(0, "Destination Server Out of Submission Period");
+        return;
+    }
     source = (x = PQgetvalue(r, 0, 0)) != NULL ? atoi(x) : -1;
     serverid = (x = PQgetvalue(r, 0, 1)) != NULL ? atoi(x) : -1;
     retries = (x = PQgetvalue(r, 0, 3)) != NULL ? atoi(x) : -1;
@@ -198,7 +238,14 @@ static void do_request(PGconn *c, int64_t rid) {
         return;
     }
 
-    resp = post_xmldata_to_server(c, serverid, data);
+    xkey = octstr_format("%ld", serverid);
+    serverconf_t *dest = dict_get(server_dict, xkey);
+    if (!dest){
+        info(0, "Failed to get server conf for server: %ld", serverid);
+        return NULL;
+    }
+
+    resp = post_xmldata_to_server(c, data, dest);
 
     if (!resp) {
         r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
@@ -237,6 +284,7 @@ static void do_request(PGconn *c, int64_t rid) {
     PQclear(r);
 
     octstr_destroy(resp);
+    octstr_destroy(xkey);
     if(doc)
         xmlFreeDoc(doc);
 }
@@ -269,6 +317,7 @@ static void request_run(PGconn *c) {
 
         sprintf(tmp, "%ld", xid);
         xkey = octstr_format("Request-%s", tmp);
+        info(0, "Gonna call do_request");
         do_request(c, xid);
 
         r = PQexec(c, "COMMIT");
@@ -337,7 +386,8 @@ static void run_request_processor(PGconn *c)
         }
 
         gwthread_sleep(config->request_process_interval);
-        info(0, "We got here ###############%ld\n", gwlist_len(req_list));
+        if ((n = gwlist_len(req_list)) > 0)
+            info(0, "We got here ###############%ld\n", gwlist_len(req_list));
 
         if (qstop)
             break;
@@ -357,9 +407,14 @@ static void run_request_processor(PGconn *c)
             init_request_processor_sql(c);
             goto loop;
         }
+        /*XXX lets populate server_dict here
+        load_serverconf_dict(c);
+        */
+
         r = PQexecPrepared(c, "REQUEST_SQL", 0, NULL, NULL, NULL, 0);
         n = PQresultStatus(r) == PGRES_TUPLES_OK ? PQntuples(r) : 0;
-        info(0, "Got %ld Ready requests to add to request-list", n);
+        if (n > 0)
+            info(0, "Got %ld Ready requests to add to request-list", n);
         for (i=0; i<n; i++) {
             char *y = PQgetvalue(r, i, 0);
             Octstr *xkey = octstr_format("Request-%s", y);
@@ -404,6 +459,7 @@ void start_request_processor(dispatcher2conf_t config, List *server_req_list)
 		PQerrorMessage(c));
         return;
     }
+    load_serverconf_dict(c);
 
     init_request_processor_sql(c);
 
@@ -415,6 +471,7 @@ void stop_request_processor(void)
 {
 
      qstop = 1;
+     dict_destroy(server_dict);
      gwthread_sleep(2); /* Give them some time */
      gwthread_wakeup(rthread_th);
 

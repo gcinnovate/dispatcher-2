@@ -22,6 +22,21 @@
 #include "misc.h"
 #include "conf.h"
 
+typedef struct serverconf_t {
+    int server_id;
+    Octstr *name;
+    Octstr *username;
+    Octstr *password;
+    Octstr *ipaddress;
+    Octstr *url;
+    Octstr *auth_method;
+    int use_ssl;
+    Octstr *ssl_client_certkey_file;
+    int start_submission_period;
+    int end_submission_period;
+} serverconf_t;
+
 void start_request_processor(dispatcher2conf_t conf, List *server_req_list);
 void stop_request_processor(void);
+void free_serverconf(serverconf_t *d);
 #endif
