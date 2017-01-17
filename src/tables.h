@@ -114,7 +114,7 @@ static char *table_cmds[] = {
 "\n"
 ,
 "-- FUNCTIONS\n"
-"-- Check if source is an allowed "source" for destination server/app dest\n"
+"-- Check if source is an allowed 'source' for destination server/app dest\n"
 "CREATE OR REPLACE FUNCTION is_allowed_source(source integer, dest integer) RETURNS BOOLEAN AS $delim$\n"
 "    DECLARE\n"
 "     t boolean;\n"
