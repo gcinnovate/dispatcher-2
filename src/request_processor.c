@@ -135,7 +135,7 @@ static void load_serverconf_dict(PGconn *c)
         server->url = octstr_create(PQgetvalue(r, i, PQfnumber(r, "url")));
         server->auth_method = octstr_create(PQgetvalue(r, i, PQfnumber(r, "auth_method")));
         server->ssl_client_certkey_file = octstr_create(PQgetvalue(r, i, PQfnumber(r, "ssl_client_certkey_file")));
-        server->use_ssl = (s = PQgetvalue(r, i, PQfnumber(r, "id"))) != NULL ? strtoull(s, NULL, 10) : 0;
+        server->use_ssl = (s = PQgetvalue(r, i, PQfnumber(r, "use_ssl"))) != NULL ? strtoull(s, NULL, 10) : 0;
         server->start_submission_period = (s = PQgetvalue(r, i,
                     PQfnumber(r, "start_submission_period"))) != NULL ? strtoul(s, NULL, 10) : 0;
         server->end_submission_period = (s = PQgetvalue(r, i,
