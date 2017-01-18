@@ -79,7 +79,7 @@ static xmlChar *findvalue(xmlDocPtr doc, xmlChar *xpath, int add_namespace){
     return value;
 }
 
-#define REQUEST_SQL "SELECT id FROM requests WHERE status = 'ready' AND is_allowed_source(source, destination)"
+#define REQUEST_SQL "SELECT id FROM requests WHERE status = 'ready' AND is_allowed_source(source, destination) ORDER BY created ASC LIMIT 10000"
 
 static void init_request_processor_sql(PGconn *c)
 {
@@ -275,7 +275,7 @@ static void do_request(PGconn *c, int64_t rid) {
     if(up) xmlFree(up);
 
     r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-            "statuscode=$2, status = 'completed', errmsg = $3 WHERE id = $1",
+            "statuscode=$2, status = 'completed', errors = $3 WHERE id = $1",
             3, NULL, pvals, NULL, NULL, 0);
     PQclear(r);
 
