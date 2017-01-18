@@ -159,7 +159,7 @@ static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *des
 
     /*  request_headers = http_create_empty_headers();*/
     request_headers = gwlist_create();
-    http_header_add(request_headers, "Content-Type", "text/xml");
+    http_header_add(request_headers, "Content-Type", "application/xml");
     http_add_basic_auth(request_headers, dest->username, dest->password);
     /* XXX Add SSL stuff here */
     if (dest->use_ssl){
