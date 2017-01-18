@@ -150,7 +150,6 @@ static void load_serverconf_dict(PGconn *c)
 
 /* Post XML to server using basic auth and return response */
 static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *dest) {
-    Octstr *url = NULL, *user = NULL, *passwd = NULL;
     HTTPCaller *caller;
 
     List *request_headers;
@@ -172,9 +171,6 @@ static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *des
 
     http_caller_destroy(caller);
     http_destroy_headers(request_headers);
-    octstr_destroy(user);
-    octstr_destroy(passwd);
-    octstr_destroy(url);
     octstr_destroy(furl);
     /*  octstr_destroy(rbody); */
 

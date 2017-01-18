@@ -161,6 +161,9 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
                 else if (strcasecmp(field, "port") == 0)
                     config->dbport = atoi(value);
                 break;
+            case 'r':
+                if (strcasecmp(field,"request-process-interval") == 0)
+                    config->request_process_interval = atof(value);
             case 's':
                 if (strcasecmp(field, "start-submission-period") == 0)
                     config->start_submission_period = atoi(value);
