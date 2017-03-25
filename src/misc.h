@@ -39,6 +39,7 @@ typedef struct request_t {
     Octstr *msisdn;
     Octstr *raw_msg;
     Octstr *facility;
+    Octstr *district;
     Octstr *report_type;
 
 } request_t;

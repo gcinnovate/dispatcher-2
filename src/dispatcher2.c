@@ -122,6 +122,7 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     Octstr *msisdn = http_cgi_variable(x->cgivars, "msisdn");
     Octstr *raw_msg = http_cgi_variable(x->cgivars, "raw_msg");
     Octstr *facility = http_cgi_variable(x->cgivars, "facility");
+    Octstr *district = http_cgi_variable(x->cgivars, "district");
     Octstr *report_type = http_cgi_variable(x->cgivars, "report_type");
 
     /*Use Basic Auth or GCI username and password to authenticate request*/
@@ -161,7 +162,8 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     req->msisdn = octstr_duplicate(msisdn);
     req->raw_msg = octstr_duplicate(raw_msg);
     req->facility = octstr_duplicate(facility);
-    req->report_type = octstr_duplicate(report_type`);
+    req->district = octstr_duplicate(district);
+    req->report_type = octstr_duplicate(report_type);
 
     if (save_request(x->dbconn, req) < 0) {
         *status = HTTP_INTERNAL_SERVER_ERROR;

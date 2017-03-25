@@ -106,9 +106,9 @@ int64_t save_request(PGconn *c, request_t *req)
     char buf3[128];
     char buf4[128];
 
-    const char *pvals[12];
-    int plens[12] = {0};
-    int pfrmt[12] = {0};
+    const char *pvals[13];
+    int plens[13] = {0};
+    int pfrmt[13] = {0};
     int64_t xid = -1;
 
     sprintf(buf1, "%d", req->source);
@@ -133,13 +133,14 @@ int64_t save_request(PGconn *c, request_t *req)
     pvals[8] = req->msisdn ? octstr_get_cstr(req->msisdn) : "";
     pvals[9] = req->raw_msg ? octstr_get_cstr(req->raw_msg) : "";
     pvals[10] = req->facility ? octstr_get_cstr(req->facility) : "";
-    pvals[11] = req->report_type ? octstr_get_cstr(req->report_type) : "";
+    pvals[11] = req->district ? octstr_get_cstr(req->district) : "";
+    pvals[12] = req->report_type ? octstr_get_cstr(req->report_type) : "";
 
     PGresult *r;
     r = PQexecParams(c,
             "INSERT INTO requests(source, destination, body, ctype, submissionid, week,"
-            "month, year, msisdn, raw_msg, facility, report_type) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+            "month, year, msisdn, raw_msg, facility, district, report_type) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
             12, NULL, pvals, plens, pfrmt, 0);
 
     if (PQresultStatus(r) != PGRES_TUPLES_OK || PQntuples(r) < 1) {
