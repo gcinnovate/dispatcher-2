@@ -36,6 +36,10 @@ typedef struct request_t {
     Octstr *month;
     Octstr *week;
     int64_t msgid; /* Submission ID in source system*/
+    Octstr *msisdn;
+    Octstr *raw_msg;
+    Octstr *facility;
+    Octstr *report_type;
 
 } request_t;
 

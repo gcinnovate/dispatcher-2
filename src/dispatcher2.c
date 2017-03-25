@@ -119,6 +119,10 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     Octstr *week = http_cgi_variable(x->cgivars, "week");
     Octstr *month = http_cgi_variable(x->cgivars, "month");
     Octstr *year = http_cgi_variable(x->cgivars, "year");
+    Octstr *msisdn = http_cgi_variable(x->cgivars, "msisdn");
+    Octstr *raw_msg = http_cgi_variable(x->cgivars, "raw_msg");
+    Octstr *facility = http_cgi_variable(x->cgivars, "facility");
+    Octstr *report_type = http_cgi_variable(x->cgivars, "report_type");
 
     /*Use Basic Auth or GCI username and password to authenticate request*/
     if (ba_auth_user(x->dbconn, x->reqh) != 0  &&
@@ -154,6 +158,10 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     req->year = (year) ? strtoul(octstr_get_cstr(year), NULL, 10) : 0;
     req->payload = octstr_duplicate(x->body);
     req->ctype = octstr_duplicate(ct);
+    req->msisdn = octstr_duplicate(msisdn);
+    req->raw_msg = octstr_duplicate(raw_msg);
+    req->facility = octstr_duplicate(facility);
+    req->report_type = octstr_duplicate(report_type`);
 
     if (save_request(x->dbconn, req) < 0) {
         *status = HTTP_INTERNAL_SERVER_ERROR;
