@@ -165,7 +165,7 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     req->district = octstr_duplicate(district);
     req->report_type = octstr_duplicate(report_type);
 
-    if (save_request(x->dbconn, req) < 0) {
+    if (save_request(x->dbconn, req, &config) < 0) {
         *status = HTTP_INTERNAL_SERVER_ERROR;
         octstr_format_append(rbody, "error: E0003: Failed to save request in database");
         info(0, "Error: 0003");

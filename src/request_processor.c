@@ -25,6 +25,7 @@
 #include <libxml/parser.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
+#include <jansson.h>
 
 #include "request_processor.h"
 
@@ -149,7 +150,7 @@ static void load_serverconf_dict(PGconn *c)
 }
 
 /* Post XML to server using basic auth and return response */
-static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *dest) {
+static Octstr *post_payload_to_server(Octstr *data, Octstr *ctype, serverconf_t *dest) {
     HTTPCaller *caller;
 
     List *request_headers;
@@ -159,7 +160,11 @@ static Octstr *post_xmldata_to_server(PGconn *c, Octstr *data, serverconf_t *des
 
     /*  request_headers = http_create_empty_headers();*/
     request_headers = gwlist_create();
-    http_header_add(request_headers, "Content-Type", "application/xml");
+    if (ctype && octstr_case_search(ctype, octstr_imm("json"), 0) >= 0)
+        http_header_add(request_headers, "Content-Type", "application/json");
+    else
+        http_header_add(request_headers, "Content-Type", "application/xml");
+
     http_add_basic_auth(request_headers, dest->username, dest->password);
     /* XXX Add SSL stuff here */
     if (dest->use_ssl){
@@ -186,10 +191,14 @@ static void do_request(PGconn *c, int64_t rid) {
     PGresult *r;
     int retries, serverid, source;
     Octstr *data;
+    Octstr *ctype;
     const char *pvals[] = {tmp, st, buf};
     Octstr *resp, *xkey;
     xmlDocPtr doc;
     xmlChar *s, *im, *ig, *up;
+    json_t *root, *status, *descr;
+    json_error_t error;
+    const char *status_text, *description;
 
     sprintf(tmp, "%ld", rid);
 
@@ -204,7 +213,7 @@ static void do_request(PGconn *c, int64_t rid) {
         return;
     }
 
-    if ((x = PQgetvalue(r, 0, 4)) && strcmp(x, "f") == 0) {
+    if ((x = PQgetvalue(r, 0, 4)) && (strcmp(x, "f") == 0)) {
         /* We're out of submission period */
         info(0, "Destination Server Out of Submission Period");
         return;
@@ -212,8 +221,11 @@ static void do_request(PGconn *c, int64_t rid) {
     source = (x = PQgetvalue(r, 0, 0)) != NULL ? atoi(x) : -1;
     serverid = (x = PQgetvalue(r, 0, 1)) != NULL ? atoi(x) : -1;
     retries = (x = PQgetvalue(r, 0, 3)) != NULL ? atoi(x) : -1;
+    x = PQgetvalue(r, 0, 5);
+    ctype = (x && x[0]) ? octstr_create(x): NULL;
     x = PQgetvalue(r, 0, 2);
-    data = (x && x[0]) ? octstr_create(x) : NULL; /* POST XML*/
+    data = (x && x[0]) ? octstr_create(x) : NULL; /* POST XML or JSON */
+
     PQclear(r);
     info(0, "Post Data %s", octstr_get_cstr(data));
 
@@ -238,10 +250,10 @@ static void do_request(PGconn *c, int64_t rid) {
     serverconf_t *dest = dict_get(server_dict, xkey);
     if (!dest){
         info(0, "Failed to get server conf for server: %ld", serverid);
-        return NULL;
+        return;
     }
 
-    resp = post_xmldata_to_server(c, data, dest);
+    resp = post_payload_to_server(data, ctype, dest);
 
     if (!resp) {
         r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
@@ -251,38 +263,97 @@ static void do_request(PGconn *c, int64_t rid) {
         return;
     }
     info(0, "Response Data %s", octstr_get_cstr(resp));
-    /* parse response - hopefully it is xml */
-    doc = xmlParseMemory(octstr_get_cstr(resp), octstr_len(resp));
 
-    if (!doc) {
-        r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode = 'ERROR3',status = 'failed' WHERE id = $1",
-                1, NULL, pvals, NULL, NULL, 0);
+    if (ctype && octstr_case_search(ctype, octstr_imm("xml"), 0) >= 0) {
+        /* parse response - hopefully it is xml */
+        doc = xmlParseMemory(octstr_get_cstr(resp), octstr_len(resp));
+
+        if (!doc) {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                    "statuscode = 'ERROR3',status = 'failed' WHERE id = $1",
+                    1, NULL, pvals, NULL, NULL, 0);
+            PQclear(r);
+            return;
+        }
+
+        s = findvalue(doc, (xmlChar *)"//xmlns:status", 1); /* third arg is 0 if no namespace required*/
+        im = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@imported", 1);
+        ig = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@ignored", 1);
+        up = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@updated", 1);
+
+        sprintf(st, "%s", s);
+        sprintf(buf, "Imported:%s Ignored:%s Updated:%s",im, ig, up);
+        if(s) xmlFree(s);
+        if(im) xmlFree(im);
+        if(ig) xmlFree(ig);
+        if(up) xmlFree(up);
+
+        if (strcasestr(s, "ERROR")) {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode=$2, status = 'failed', errors = $3 WHERE id = $1",
+                3, NULL, pvals, NULL, NULL, 0);
+        } else {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode=$2, status = 'completed', errors = $3 WHERE id = $1",
+                3, NULL, pvals, NULL, NULL, 0);
+
+        }
         PQclear(r);
-        return;
+
+        if(doc)
+            xmlFreeDoc(doc);
+    } else if (ctype && octstr_case_search(ctype, octstr_imm("json"), 0) >= 0) {
+        /* Let's parse the JSON response */
+        root = json_loads(octstr_get_cstr(resp), 0, &error);
+        if (!root) {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode = 'ERROR4', status = 'failed' WHERE id = $1",
+                1, NULL, pvals, NULL, NULL, 0);
+            PQclear(r);
+            goto done;
+        }
+        status = json_object_get(root, "status");
+        if (!json_is_string(status)) {
+            info(0, "Failed to parse JSON reposne: (status).");
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode = 'ERROR5',status = 'failed' WHERE id = $1",
+                1, NULL, pvals, NULL, NULL, 0);
+            PQclear(r);
+            json_decref(root);
+            goto done;
+        }
+        status_text = json_string_value(status);
+        sprintf(st, "%s", status_text);
+
+        descr = json_object_get(root, "description");
+        if (!json_is_string(descr)) {
+            info(0, "Failed to parse JSON reposne: (description).");
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode = 'ERROR6',status = 'failed' WHERE id = $1",
+                1, NULL, pvals, NULL, NULL, 0);
+            PQclear(r);
+            json_decref(root);
+            goto done;
+        }
+        description = json_string_value(descr);
+        sprintf(buf, description);
+
+        if (strcasecmp(status_text, "ERROR") == 0) {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode=$2, status = 'failed', errors = $3 WHERE id = $1",
+                3, NULL, pvals, NULL, NULL, 0);
+        } else {
+            r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode=$2, status = 'completed', errors = $3 WHERE id = $1",
+                3, NULL, pvals, NULL, NULL, 0);
+
+        }
+        PQclear(r);
+
     }
-
-    s = findvalue(doc, (xmlChar *)"//xmlns:status", 1); /* third arg is 0 if no namespace required*/
-    im = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@imported", 1);
-    ig = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@ignored", 1);
-    up = findvalue(doc, (xmlChar *)"//xmlns:importCount[1]/@updated", 1);
-
-    sprintf(st, "%s", s);
-    sprintf(buf, "Imported:%s Ignored:%s Updated:%s",im, ig, up);
-    if(s) xmlFree(s);
-    if(im) xmlFree(im);
-    if(ig) xmlFree(ig);
-    if(up) xmlFree(up);
-
-    r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-            "statuscode=$2, status = 'completed', errors = $3 WHERE id = $1",
-            3, NULL, pvals, NULL, NULL, 0);
-    PQclear(r);
-
+done:
     octstr_destroy(resp);
     octstr_destroy(xkey);
-    if(doc)
-        xmlFreeDoc(doc);
 }
 
 static void request_run(PGconn *c) {

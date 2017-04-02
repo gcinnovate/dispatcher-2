@@ -26,6 +26,7 @@ struct dispatcher2conf {
     int use_global_submission_period;
     int start_submission_period;
     int end_submission_period;
+    char default_queue_status[128];
 };
 
 typedef struct dispatcher2conf *dispatcher2conf_t;

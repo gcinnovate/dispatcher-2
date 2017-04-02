@@ -20,6 +20,7 @@
 
 #include <unistd.h>
 #include "gwlib/gwlib.h"
+#include "conf.h"
 #include "dispatcher2-config.h"
 
 #include <libpq-fe.h>
@@ -49,7 +50,7 @@ char *strip_space(char x[]);
 
 int auth_user(PGconn *c, char *user, char *pass);
 int ba_auth_user(PGconn *c, List *rh); /* Basic Auth */
-int64_t save_request(PGconn *c, request_t *req);
+int64_t save_request(PGconn *c, request_t *req, dispatcher2conf_t config);
 int get_server(PGconn *c, char *name);
 int parse_cgivars(List *request_headers, Octstr *request_body,
         List **cgivars, List **cgivar_ctypes);

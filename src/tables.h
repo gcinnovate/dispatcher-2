@@ -59,6 +59,9 @@ static char *table_cmds[] = {
 "CREATE INDEX requests_idx5 ON requests(month);\n"
 "CREATE INDEX requests_idx6 ON requests(year);\n"
 "CREATE INDEX requests_idx7 ON requests(ctype);\n"
+"CREATE INDEX requests_idx8 ON requests(msisdn);\n"
+"CREATE INDEX requests_idx9 ON requests(facility);\n"
+"CREATE INDEX requests_idx10 ON requests(district);\n"
 "\n"
 ,
 "INSERT INTO servers (name, username, password, ipaddress, url, auth_method)\n"

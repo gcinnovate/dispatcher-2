@@ -89,6 +89,8 @@ static int conf_init(dispatcher2conf_t config)
     snprintf(config->dbpass, sizeof config->dbpass, "postgres");
     snprintf(config->dbname, sizeof config->dbname, "dispatcher2");
     snprintf(config->logdir, sizeof config->logdir, "/var/log");
+    snprintf(config->default_queue_status,
+            sizeof config->default_queue_status, "pending");
 
     mygethostname(config->myhostname, sizeof config->myhostname);
 
@@ -132,6 +134,9 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
             case 'd':
                 if (strcasecmp(field, "database") == 0)
                     snprintf(config->dbname, sizeof config->dbname,"%s", value);
+                else if (strcasecmp(field, "default-queue-status") == 0)
+                    snprintf(config->default_queue_status,
+                            sizeof config->default_queue_status,"%s", value);
                 break;
             case 'e':
                 if (strcasecmp(field, "end-submission-period") == 0)
@@ -182,7 +187,7 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
                 if (strcasecmp(field, "user") == 0)
                     snprintf(config->dbuser, sizeof config->dbuser, "%s", value);
                 else if (strcasecmp(field, "use-global-submission-period") == 0)
-                    config->use_global_submission_period = atoi(value);
+                    config->use_global_submission_period = (strcasecmp(value, "true") == 0);
 #ifdef HAVE_LIBSSL
                 else if (strcasecmp(field, "use-ssl") == 0)
                     config->use_ssl = (strcasecmp(value, "true") == 0);
