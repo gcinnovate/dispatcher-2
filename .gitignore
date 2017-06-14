@@ -29,3 +29,10 @@ stamp-*
 *~
 *.swp
 *.pyc
+web/local_settings.py
+web/test/test_flow.py
+web/static/downloads/
+*.zip
+*.csv
+*xls
+*.xlsx
