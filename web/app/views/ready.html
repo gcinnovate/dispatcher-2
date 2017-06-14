@@ -1,0 +1,187 @@
+{% extends "layout.html" %}
+{% from 'layout.html' import navbar, myscripts %}
+
+{% block title %}Dispatcher2.::.Ready{% endblock%}
+{% block stylesheets %}
+    <!-- Data Tables -->
+    <link href="/static/css/plugins/dataTables/dataTables.bootstrap.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.responsive.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.tableTools.min.css" rel="stylesheet">
+    <link href="/static/js/plugins/Buttons-1.1.2/css/buttons.dataTables.min.css" rel="stylesheet">
+    <!-- Sweet Alert -->
+    <link href="/static/css/plugins/sweetalert/sweetalert.css" rel="stylesheet">
+{% endblock %}
+
+{% block nav %}
+    {% call navbar() %}
+
+    {% endcall %}
+{% endblock %}
+
+{% block content %}
+   <!-- DATA TABLE -->
+    <form class="form-horizontal" role="form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="ibox float-e-margins">
+                <div class="ibox-title">
+                    <h5>Ready Requests</h5>
+                    <div class="ibox-tools">
+                        <button class="btn btn-danger delete_btn" name="abtn" value="Cancel Selected"><i class="fa fa-thumbs-o-down"></i> Cancel Selected</button>
+                        <a class="collapse-link">
+                            <i class="fa fa-chevron-up"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="ibox-content">
+                    <div class="table-responsive">
+						<table id="mydata" class="table table-striped table-bordered table-hover dataTables-example">
+							<thead>
+							<tr>
+								<th><input id="selecctall" class=".chkmark" type="checkbox"/></th>
+								<th>Facility</th>
+								<th>Reporter</th>
+								<th>Report</th>
+								<th>Week</th>
+								<th>Creation Date</th>
+								<th>Status</th>
+								<th>Action</th></tr>
+							</thead>
+							<tbody>
+							{% for l in res %}
+								<tr>
+									<td><input name="reqid" class="topromote" value="{{ l.id }}" type="checkbox"/></td>
+									<td>{{ l.facility }}</td>
+									<td>{{ l.msisdn }}</td>
+									<td>{{ l.raw_msg}}</td>
+									<td>{{ l.year|string + "W" + l.week }}</td>
+									<td>{{ l.created|datetimeformat }}</td>
+									<td>{{ l.status }}</td>
+									<td>
+                                        <button type="button" class="btn btn-white btn-xs details_btn" id="{{l.id}}" data-toggle="modal"
+                                                data-target="#myModal2">
+                                                 <i title="Details" class="fa fa-list-alt"></i>
+                                        </button>
+										&nbsp;&nbsp;&nbsp;
+                                        <button type="button" class="btn btn-danger btn-xs delete_btn" id={{ l.id}}><i class="fa fa-trash-o"></i></button>
+									</td>
+								</tr>
+							{% endfor%}
+							</tbody>
+						</table>
+    					{{ pagination_str }}
+                   </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </form>
+    <!-- END DATA TABLE -->
+    <div class="modal inmodal" id="myModal2" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content animated flipInY">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span>
+                        <span class="sr-only">Close</span></button>
+                        <h4 class="modal-title">Request Details</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row" id="modal_res">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-white" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {% call myscripts() %}
+        <!-- Data Tables -->
+        <script src="/static/js/plugins/dataTables/jquery.dataTables.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.bootstrap.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.responsive.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.tableTools.min.js"></script>
+
+       	<script type="text/javascript" src="/static/js/plugins/Buttons-1.1.2/js/dataTables.buttons.min.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/Buttons-1.1.2/js/buttons.flash.min.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/jszip.min.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/pdfmake.min.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/vfs_fonts.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/Buttons-1.1.2/js/buttons.html5.min.js"></script>
+        <script type="text/javascript" src="/static/js/plugins/Buttons-1.1.2/js/buttons.print.min.js"></script>
+        <script src="/static/js/plugins/bootstrap-validator/dist/validator.min.js"></script>
+        <!-- Sweet alert -->
+        <script src="/static/js/plugins/sweetalert/sweetalert.min.js"></script>
+        <script src="/static/js/mtrackpro/adminunits.js"></script>
+        <script>
+           $(document).ready(function() {
+            $('.delete_btn').click(function () {
+                del_id = $(this).attr('id');
+                table_row = $(this).closest('tr');
+                swal({
+                        title: "Are you sure?",
+                        text: "Your will not be able to recover all request details",
+                        type: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#DD6B55",
+                        confirmButtonText: "Yes, delete it!",
+                        cancelButtonText: "No, cancel please!",
+                        closeOnConfirm: false,
+                        closeOnCancel: false },
+                    function (isConfirm) {
+                        if (isConfirm) {
+                            $.get(
+                                '/api/v1/requests_del/' + del_id,
+                                {d_id: del_id, caller: 'api'},
+                                function(data){
+                                    if (data.message == "success"){
+                                        /* remove row from table */
+                                        table_row.remove();
+                                    };
+                                },
+                                'json'
+                            );
+                            swal("Deleted!", "Request [id:" + del_id + "]vhas been deleted.", "success");
+                            return false;
+                        } else {
+                            swal("Cancelled", "Request details are safe!", "error");
+                            return false;
+                        }
+                    });
+            });
+			$('#mydata').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    pageLength: 25,
+                    bPaginate: false,
+                    info: false
+
+            });
+			$('#selecctall').click(function (event) {
+                $('.topromote:input:checkbox').prop('checked', this.checked);
+            });
+            $(".topromote").click(function () {
+                if (!$(this).is(':checked'))
+                    $("#selecctall").prop('checked', false);
+            });
+            $('.details_btn').click(function(){
+                id_val = $(this).attr('id');
+                $.get(
+					'/api/v1/request_details/' + id_val,
+					{},
+					function(data){
+							$('#modal_res').html(data);
+				});
+            });
+        });
+        </script>
+    {% endcall %}
+{% endblock %}
+
+

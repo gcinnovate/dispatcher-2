@@ -1,0 +1,319 @@
+{% extends "layout.html" %}
+{% from 'layout.html' import navbar, myscripts %}
+
+{% block title %}Dispatcher2.::.App Settings{% endblock%}
+{% block stylesheets %}
+    <!-- Data Tables -->
+    <link href="/static/css/plugins/dataTables/dataTables.bootstrap.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.responsive.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.tableTools.min.css" rel="stylesheet">
+    <!-- Sweet Alert -->
+    <link href="/static/css/plugins/sweetalert/sweetalert.css" rel="stylesheet">
+{% endblock %}
+
+{% block nav %}
+    {% call navbar() %}
+
+    {% endcall %}
+{% endblock %}
+
+{% block content %}
+    <form class="form-horizontal" role="form" method="post">
+	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="row">
+        <!-- LEFT-->
+        <div class="col-lg-6">
+            <div class="ibox float-e-margins">
+               <div class="ibox-title">
+                    <h5>Application/Server Settings</h5>
+                    <div class="ibox-tools">
+                        <a class="collapse-link">
+                            <i class="fa fa-chevron-up"></i>
+                        </a>
+                    </div>
+                </div>
+
+				<div class="ibox-content">
+					<div class="form-group">
+						<label for="name" class="col-lg-5 control-label">Name:</label>
+						<div class="col-lg-7">
+                            <input name="name" id="name" type="text" value="{{ name }}" class="form-control"/>
+						</div>
+					</div>
+			        <div class="form-group">
+						<label for="username" class="col-lg-5 control-label">Username:</label>
+						<div class="col-lg-7">
+                            <input name="username" id="username" type="text" value="{{ username }}" class="form-control"/>
+						</div>
+					</div>
+		            <div class="form-group">
+						<label for="password" class="col-lg-5 control-label">Password:</label>
+						<div class="col-lg-7">
+                            <input name="password" id="msidn" type="password" value="{{ passwd }}" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="cpasswd" class="col-lg-5 control-label">Confirm Password:</label>
+						<div class="col-lg-7">
+                            <input name="cpasswd" id="msidn" type="password" value="{{ passwd }}" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="url" class="col-lg-5 control-label">Data Submission Endpoint:</label>
+						<div class="col-lg-7">
+                            <input name="url" id="url" type="text" value="{{ url }}" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="allowed_apps" class="col-lg-5 control-label">Allowed Apps/Server:</label>
+						<div class="col-lg-7">
+							<select name="allowed_apps" id="allowed_apps" class="form-control" multiple>
+								<!--<option value="">Select App/Server</option>-->
+								{% for r in servers_opts %}
+                        			<option value="{{ r.id }}">{{ r.name }}</option>
+                    			{% endfor %}
+							</select>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="auth_method" class="col-lg-5 control-label">Auth Method:</label>
+						<div class="col-lg-7">
+							<select name="auth_method" id="auth_method" class="form-control">
+								<option value="">Select Authentication Method</option>
+								{% for y in ['Basic Auth',] %}
+                        			<option value="{{ y }}" {% if y == auth_method %} selected="yes" {% endif%}>{{ y }}</option>
+                    			{% endfor %}
+							</select>
+						</div>
+					</div>
+
+				</div>
+            </div>
+        </div>
+        <!-- END LEFT-->
+
+        <!-- RIGHT-->
+        <div class="col-lg-6">
+            <div class="ibox float-e-margins">
+				<div class="ibox-title">
+                    <h5>Application/Server Settings</h5>
+                    <div class="ibox-tools">
+                        <a class="collapse-link">
+                            <i class="fa fa-chevron-up"></i>
+                        </a>
+                    </div>
+                </div>
+
+				<div class="ibox-content">
+                    <div class="form-group">
+						<label for="start" class="col-lg-5 control-label">Start of Submission Period:</label>
+						<div class="col-lg-7">
+                            <select name="start" id="auth_method" class="form-control">
+								<option value="">Select Starting Hour</option>
+								{% for y in range(0, 24) %}
+                        			<option value="{{ y }}" {% if y == start %} selected="yes" {% endif%}>{{ y }}</option>
+                    			{% endfor %}
+							</select>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="end" class="col-lg-5 control-label">End of Submission Period:</label>
+						<div class="col-lg-7">
+                            <select name="end" id="auth_method" class="form-control">
+								<option value="">Select Ending Hour</option>
+								{% for y in range(0, 24) %}
+                        			<option value="{{ y }}" {% if y == end %} selected="yes" {% endif%}>{{ y }}</option>
+                    			{% endfor %}
+							</select>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label for="xml_xpath" class="col-lg-5 control-label">XML Response Status XPath:</label>
+						<div class="col-lg-7">
+                            <input name="xml_xpath" id="xml_xpath" value="{{ xml_xpath }}" type="text" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="json_xpath" class="col-lg-5 control-label">JSON Response Status Path:</label>
+						<div class="col-lg-7">
+                            <input name="json_xpath" id="json_xpath" value="{{ json_xpath }}" type="text" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+                        <label for="use_ssl" class="col-lg-5 control-label">Use SSL:</label>
+                        <div class="col-lg-7">
+                            <input name="use_ssl" id="use_ssl" type="checkbox"
+                                {% if use_ssl == True %}
+                                    checked = "yes"
+                                {% endif %}
+                                                                                                                                                                                        class="" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+						<label for="ssl_client_certkey_file" class="col-lg-5 control-label">SSL Client CertKey File Path:</label>
+						<div class="col-lg-7">
+                            <input name="ssl_client_certkey_file" id="ssl_client_certkey_file" value="{{ ssl_client_certkey_file }}" type="text" class="form-control"/>
+						</div>
+					</div>
+                    <div class="form-group">
+						<label for="ssl_server_certkey_file" class="col-lg-5 control-label">SSL Server CertKey File Path:</label>
+						<div class="col-lg-7">
+                            <input name="ssl_server_certkey_file" id="ssl_server_certkey_file" type="text" class="form-control"/>
+						</div>
+					</div>
+					<div class="form-group">
+						<div class="col-lg-offset-5 col-lg-5">
+							<button class="btn btn-sm btn-primary" type="submit">Save</button>
+						</div>
+                    </div>
+                    <br/>
+				</div>
+            </div>
+        </div>
+        <!-- END RIGHT-->
+    </div>
+</form>
+<!-- DATA TABLE -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="ibox float-e-margins">
+                <div class="ibox-title">
+                    <h5>Applications/Servers</h5>
+                    <div class="ibox-tools">
+                        <a class="collapse-link">
+                            <i class="fa fa-chevron-up"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="ibox-content">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered table-hover dataTables-example" >
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Username</th>
+                                    <th>Password</th>
+                                    <th>Allowed Apps/Servers</th>
+                                    <th>Auth Method</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for server in servers %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ server.name }}</td>
+                                    <td>{{ server.username }}</td>
+                                    <td>{{ server.password }}</td>
+                                    <td>{{ server.apps }}</td>
+                                    <td>{{ server.auth_method }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-white btn-xs details_btn" id="{{server.id}}" data-toggle="modal"
+                                                data-target="#myModal2">
+                                                 <i title="Details" class="fa fa-list-alt"></i>
+                                        </button>
+										&nbsp;&nbsp;
+										<a href="/appsettings?ed={{ server.id }}&page={{ page}}" class="btn btn-primary btn-xs" value={{ server.id }}>
+                                            <i class="fa fa-edit"></i>
+                                        </a>
+                                        &nbsp;&nbsp;
+                                        <button class="btn btn-danger btn-xs delete_btn" id={{ server.id}}><i class="fa fa-trash-o"></i></button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {{ pagination_str }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END DATA TABLE -->
+    <div class="modal inmodal" id="myModal2" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content animated flipInY">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span>
+                        <span class="sr-only">Close</span></button>
+                        <h4 class="modal-title">Server Details</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row" id="modal_res">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-white" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    {% call myscripts() %}
+        <!-- Data Tables -->
+        <script src="/static/js/plugins/dataTables/jquery.dataTables.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.bootstrap.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.responsive.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.tableTools.min.js"></script>
+
+        <script src="/static/js/plugins/bootstrap-validator/dist/validator.min.js"></script>
+        <!-- Sweet alert -->
+        <script src="/static/js/plugins/sweetalert/sweetalert.min.js"></script>
+        <script>
+            $(document).ready(function() {
+                $('.delete_btn').click(function () {
+                del_id = $(this).attr('id');
+                table_row = $(this).closest('tr');
+                swal({
+                        title: "Are you sure?",
+                        text: "Your will not be able to recover all server details",
+                        type: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#DD6B55",
+                        confirmButtonText: "Yes, delete it!",
+                        cancelButtonText: "No, cancel please!",
+                        closeOnConfirm: false,
+                        closeOnCancel: false },
+                    function (isConfirm) {
+                        if (isConfirm) {
+                            $.get(
+                                '/api/v1/server_del/' + del_id,
+                                {d_id: del_id, caller: 'api'},
+                                function(data){
+                                    if (data.message == "success"){
+                                        /* remove row from table */
+                                        table_row.remove();
+                                        $("#allowed_apps " + "option[value='" + del_id + "']").remove();
+                                    };
+                                },
+                                'json'
+                            );
+                            swal("Deleted!", "Server [id: " + del_id  + " ] has been deleted.", "success");
+                            return false;
+                        } else {
+                            swal("Cancelled", "Server details are safe!", "error");
+                            return false;
+                        }
+                    });
+            });
+			$('#mydata').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    pageLength: 25,
+                    bPaginate: false,
+                    info: false
+
+            });
+            });
+        </script>
+    {% endcall %}
+{% endblock %}
+
+

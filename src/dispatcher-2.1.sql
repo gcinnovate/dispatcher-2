@@ -1,3 +1,7 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS plpythonu;
+create EXTENSION IF NOT EXISTS xml2;
+
 CREATE TABLE servers(
     id serial PRIMARY KEY NOT NULL,
     name text NOT NULL,
@@ -39,6 +43,11 @@ CREATE TABLE requests(
     week text DEFAULT '', -- reporting week
     month text DEFAULT '', -- reporting month
     year INTEGER, -- year of submission
+    msisdn TEXT NOT NULL DEFAULT '', -- can be report sender in source"
+    raw_msg TEXT NOT NULL DEFAULT '', -- raw message in source system
+    facility TEXT NOT NULL DEFAULT '', -- facility owning report
+    district TEXT NOT NULL DEFAULT '', -- district
+    report_type TEXT NOT NULL DEFAULT '',
     created timestamptz DEFAULT current_timestamp,
     updated timestamptz DEFAULT current_timestamp
 );
@@ -126,6 +135,39 @@ CREATE OR REPLACE FUNCTION in_submission_period(server_id integer) RETURNS BOOLE
         RETURN t;
     END;
 $delim$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pp_json(j TEXT, sort_keys BOOLEAN = TRUE, indent TEXT = '    ')
+RETURNS TEXT AS $$
+    import simplejson as json
+    if not j:
+        return ''
+    return json.dumps(json.loads(j), sort_keys=sort_keys, indent=indent)
+$$ LANGUAGE plpythonu;
+
+CREATE OR REPLACE FUNCTION xml_pretty(xml text)
+RETURNS xml AS $$
+	SELECT xslt_process($1,
+'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:strip-space elements="*" />
+<xsl:output method="xml" indent="yes" />
+<xsl:template match="node() | @*">
+<xsl:copy>
+<xsl:apply-templates select="node() | @*" />
+</xsl:copy>
+</xsl:template>
+</xsl:stylesheet>')::xml
+$$ LANGUAGE SQL IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION body_pprint(body text)
+    RETURNS TEXT AS $$
+    BEGIN
+        IF xml_is_well_formed_document(body) THEN
+            return xml_pretty(body)::text;
+        ELSE
+            return pp_json(body, 't', '    ');
+        END IF;
+    END;
+$$ LANGUAGE plpgsql;
 
 -- Data Follows
 INSERT INTO user_roles(user_role, descr)

@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% from 'layout.html' import navbar, myscripts %}
+
+{% block title %}Dispatcher2.::.Downloads{% endblock%}
+{% block stylesheets %}
+    <!-- Data Tables -->
+    <link href="/static/css/plugins/dataTables/dataTables.bootstrap.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.responsive.css" rel="stylesheet">
+    <link href="/static/css/plugins/dataTables/dataTables.tableTools.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block nav %}
+    {% call navbar() %}
+
+    {% endcall %}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+	<div class="col-lg-3">
+		<div class="ibox float-e-margins">
+			<div class="ibox-title"><h5>Failed Requests</h5></div>
+			<div class="ibox-content">
+				<div>
+				<button class="btn btn-outline btn-success  dim" type="button"><i class="fa fa-download"></i></button><br/>
+				</div>
+				<small>Download</small>
+			</div>
+   		</div>
+	</div>
+    <div class="col-lg-3">
+		<div class="ibox float-e-margins">
+			<div class="ibox-title"><h5>Completed Requests</h5></div>
+			<div class="ibox-content">
+				<div>
+				</div>
+			</div>
+   		</div>
+	</div>
+</div>
+
+<div class="row">
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+    {% call myscripts() %}
+        <!-- Data Tables -->
+        <script src="/static/js/plugins/dataTables/jquery.dataTables.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.bootstrap.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.responsive.js"></script>
+        <script src="/static/js/plugins/dataTables/dataTables.tableTools.min.js"></script>
+
+        <script src="/static/js/plugins/bootstrap-validator/dist/validator.min.js"></script>
+        <script>
+           $(document).ready(function() {
+            $('.dataTables-example').DataTable({
+                "dom": 'lTfigt',
+                "tableTools": {
+                    "sSwfPath": "/static/js/plugins/dataTables/swf/copy_csv_xls_pdf.swf"
+                }
+            });
+
+        });
+        </script>
+    {% endcall %}
+{% endblock %}
+
+
