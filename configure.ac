@@ -22,6 +22,15 @@ AC_CONFIG_HEADER([src/dispatcher2-config.h])
 AC_PROG_CC
 
 # Checks for libraries.
+PKG_PROG_PKG_CONFIG([0.25])
+PKG_CHECK_MODULES([jansson], [jansson >= 2.7],
+    [jansson_flags=`$PKG_CONFIG --cflags --libs jansson`],
+    [jansson_flags=;])
+if test "x$jansson_flags" = x; then
+    AC_MSG_ERROR([jansson JSON C library not found])
+else
+    LIBS="$LIBS $jansson_flags"
+fi
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -223,7 +232,7 @@ AC_ARG_ENABLE(ssl,
 if test "$ssl" = "yes" ; then
   dnl test only if --with-ssl has not been used
   if test "x$ssllib" = "x" && test "x$sslinc" = "x"; then
-    for loc in /usr/lib /usr/lib64 /usr/local/ssl/lib /usr/local/openssl/lib /opt/local/lib; do
+    for loc in /usr/lib /usr/lib64 /usr/local/ssl/lib /usr/local/ssl/lib /opt/local/lib; do
       if test -f "$loc/libssl.a" -o -f "$loc/libssl.so" -o -f "$loc/libssl.dylib" ; then
         ssllib="$loc"
       fi
