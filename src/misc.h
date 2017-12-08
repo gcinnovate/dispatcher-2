@@ -32,6 +32,7 @@ typedef struct request_t {
     int destination;
 
     Octstr *payload;
+    Octstr *is_qparams; /* Whether request body are query params to use in URL*/
     Octstr *ctype;
     int year;
     Octstr *month;
@@ -46,12 +47,18 @@ typedef struct request_t {
 } request_t;
 
 int dispatcher2_init(char *dbuser, char *dbpass, char *dbname, char *host, int port);
+
 char *strip_space(char x[]);
 
 int auth_user(PGconn *c, char *user, char *pass);
+
 int ba_auth_user(PGconn *c, List *rh); /* Basic Auth */
+
 int64_t save_request(PGconn *c, request_t *req, dispatcher2conf_t config);
+
 int get_server(PGconn *c, char *name);
+
 int parse_cgivars(List *request_headers, Octstr *request_body,
         List **cgivars, List **cgivar_ctypes);
+
 #endif

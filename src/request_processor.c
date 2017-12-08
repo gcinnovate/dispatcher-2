@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 #include <libpq-fe.h>
 #include <libxml/xmlmemory.h>
@@ -106,6 +107,7 @@ void free_serverconf(serverconf_t *d)
     octstr_destroy(d->ipaddress);
     octstr_destroy(d->url);
     octstr_destroy(d->auth_method);
+    octstr_destroy(d->http_method);
     octstr_destroy(d->ssl_client_certkey_file);
     gw_free(d);
 }
@@ -135,8 +137,10 @@ static void load_serverconf_dict(PGconn *c)
         server->ipaddress = octstr_create(PQgetvalue(r, i, PQfnumber(r, "ipaddress")));
         server->url = octstr_create(PQgetvalue(r, i, PQfnumber(r, "url")));
         server->auth_method = octstr_create(PQgetvalue(r, i, PQfnumber(r, "auth_method")));
+        server->http_method = octstr_create(PQgetvalue(r, i, PQfnumber(r, "http_method")));
         server->ssl_client_certkey_file = octstr_create(PQgetvalue(r, i, PQfnumber(r, "ssl_client_certkey_file")));
-        server->use_ssl = (s = PQgetvalue(r, i, PQfnumber(r, "use_ssl"))) != NULL ? strtoull(s, NULL, 10) : 0;
+        server->use_ssl = strcmp(PQgetvalue(r, i, PQfnumber(r, "use_ssl")), "t") == 0 ?  1 : 0;
+        server->parse_responses = strcmp(PQgetvalue(r, i, PQfnumber(r, "parse_responses")), "t") == 0 ?  1 : 0;
         server->start_submission_period = (s = PQgetvalue(r, i,
                     PQfnumber(r, "start_submission_period"))) != NULL ? strtoul(s, NULL, 10) : 0;
         server->end_submission_period = (s = PQgetvalue(r, i,
@@ -150,13 +154,17 @@ static void load_serverconf_dict(PGconn *c)
 }
 
 /* Post XML to server using basic auth and return response */
-static Octstr *post_payload_to_server(Octstr *data, Octstr *ctype, serverconf_t *dest) {
+static Octstr *post_payload_to_server(Octstr *data, Octstr *ctype,
+        serverconf_t *dest, int body_is_query_param) {
     HTTPCaller *caller;
 
     List *request_headers;
-    Octstr *furl = NULL, *rbody = NULL;
-    int method = HTTP_METHOD_POST;
-    int status = -1;
+    Octstr *furl = NULL, *rbody = NULL, *xurl = NULL;
+    int method = HTTP_METHOD_POST; /* default is POST */
+    int i, status = -1;
+
+    if (octstr_compare(dest->http_method, octstr_imm("GET")) == 0)
+        method = HTTP_METHOD_GET;
 
     /*  request_headers = http_create_empty_headers();*/
     request_headers = gwlist_create();
@@ -167,16 +175,43 @@ static Octstr *post_payload_to_server(Octstr *data, Octstr *ctype, serverconf_t 
 
     http_add_basic_auth(request_headers, dest->username, dest->password);
     /* XXX Add SSL stuff here */
-    if (dest->use_ssl){
-        info(0, "Client Will now use SSL to post data!");
-    }
     caller = http_caller_create();
-    http_start_request(caller, method, dest->url, request_headers, data, 1, NULL, NULL);
+    if (dest->use_ssl && (octstr_compare(dest->ssl_client_certkey_file, octstr_imm("")) != 0)){
+        info(0, "Using HTTPS client to post data: certkey_file:%s!",
+                octstr_get_cstr(dest->ssl_client_certkey_file));
+        if (body_is_query_param == 0) {
+            http_start_request(caller, method, dest->url, request_headers, data, 1, NULL,
+                dest->ssl_client_certkey_file);
+        } else {
+            /* append body to url nicely and make call */
+            if ((i = octstr_search_char(dest->url, '?', 0)) > 0) {
+                xurl = octstr_format("%S%S", dest->url, data);
+            } else{
+                xurl = octstr_format("%S?%S", dest->url, data);
+            }
+            http_start_request(caller, method, xurl, request_headers, NULL, 1, NULL,
+                    dest->ssl_client_certkey_file);
+        }
+    } else {
+        info(0, "Using normal HTTP client to post data!");
+        if (body_is_query_param == 0) {
+            http_start_request(caller, method, dest->url, request_headers, data, 1, NULL, NULL);
+        } else {
+            /* append body to url nicely and make call */
+            if ((i = octstr_search_char(dest->url, '?', 0)) > 0) {
+                xurl = octstr_format("%S%S", dest->url, data);
+            } else{
+                xurl = octstr_format("%S?%S", dest->url, data);
+            }
+            http_start_request(caller, method, xurl, request_headers, NULL, 1, NULL, NULL);
+        }
+    }
     http_receive_result_real(caller, &status, &furl, &request_headers, &rbody, 1);
 
     http_caller_destroy(caller);
     http_destroy_headers(request_headers);
     octstr_destroy(furl);
+    octstr_destroy(xurl);
     /*  octstr_destroy(rbody); */
 
     if (status == -1){
@@ -189,7 +224,7 @@ static Octstr *post_payload_to_server(Octstr *data, Octstr *ctype, serverconf_t 
 static void do_request(PGconn *c, int64_t rid) {
     char tmp[64] = {0}, *cmd, *x, buf[256] = {0}, st[64] = {0};
     PGresult *r;
-    int retries, serverid, source;
+    int retries, serverid, source, body_is_query_param = 0;
     Octstr *data;
     Octstr *ctype;
     const char *pvals[] = {tmp, st, buf};
@@ -203,8 +238,8 @@ static void do_request(PGconn *c, int64_t rid) {
     sprintf(tmp, "%ld", rid);
 
     /* NOWAIT forces failure if the record is locked. Also we do not process if not yet time.*/
-    cmd = "SELECT source, destination, body, retries, in_submission_period(destination), ctype "
-        "FROM requests WHERE id = $1 FOR UPDATE NOWAIT";
+    cmd = "SELECT source, destination, body, retries, in_submission_period(destination), ctype, "
+        " body_is_query_param FROM requests WHERE id = $1 FOR UPDATE NOWAIT";
 
     r = PQexecParams(c, cmd, 1, NULL, pvals, NULL, NULL, 0);
     if (PQresultStatus(r) != PGRES_TUPLES_OK || PQntuples(r) <= 0) {
@@ -225,6 +260,9 @@ static void do_request(PGconn *c, int64_t rid) {
     ctype = (x && x[0]) ? octstr_create(x): NULL;
     x = PQgetvalue(r, 0, 2);
     data = (x && x[0]) ? octstr_create(x) : NULL; /* POST XML or JSON */
+    if ((x = PQgetvalue(r, 0, 6)) && (strcmp(x, "t") == 0))
+        body_is_query_param = 1;
+
 
     PQclear(r);
     info(0, "Post Data %s", octstr_get_cstr(data));
@@ -239,30 +277,39 @@ static void do_request(PGconn *c, int64_t rid) {
 
     if (!data){
         r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode='ERROR1', status = 'failed' WHERE id = $1",
+                "statuscode='ERROR1', errors = 'Empty response from server', "
+                "status = 'failed' WHERE id = $1",
                 1, NULL, pvals, NULL, NULL, 0);
         PQclear(r);
         /* Mark this one as failed*/
         return;
     }
 
-    xkey = octstr_format("%ld", serverid);
+    xkey = octstr_format("%d", serverid);
     serverconf_t *dest = dict_get(server_dict, xkey);
     if (!dest){
-        info(0, "Failed to get server conf for server: %ld", serverid);
+        info(0, "Failed to get server conf for server: %d", serverid);
         return;
     }
 
-    resp = post_payload_to_server(data, ctype, dest);
+    resp = post_payload_to_server(data, ctype, dest, body_is_query_param);
 
     if (!resp) {
         r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode = 'ERROR2', status = 'failed' WHERE id = $1",
+                "statuscode = 'ERROR2', errors = 'Server possibly unreachable!', "
+                "status = 'failed' WHERE id = $1",
                 1, NULL, pvals, NULL, NULL, 0);
         PQclear(r);
         return;
     }
     info(0, "Response Data %s", octstr_get_cstr(resp));
+    if (!dest->parse_responses){
+        r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
+                "statuscode = 'SUCCESS', status = 'completed' WHERE id = $1",
+                1, NULL, pvals, NULL, NULL, 0);
+        PQclear(r);
+        return;
+    }
 
     if (ctype && octstr_case_search(ctype, octstr_imm("xml"), 0) >= 0) {
         /* parse response - hopefully it is xml */
@@ -270,7 +317,8 @@ static void do_request(PGconn *c, int64_t rid) {
 
         if (!doc) {
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                    "statuscode = 'ERROR3',status = 'failed' WHERE id = $1",
+                    "statuscode = 'ERROR3', errors = 'Response possibly not proper XML', "
+                    "status = 'failed' WHERE id = $1",
                     1, NULL, pvals, NULL, NULL, 0);
             PQclear(r);
             return;
@@ -288,13 +336,13 @@ static void do_request(PGconn *c, int64_t rid) {
         if(ig) xmlFree(ig);
         if(up) xmlFree(up);
 
-        if (strcasestr(s, "ERROR")) {
+        if (strcasestr(st, "ERROR")) {
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
                 "statuscode=$2, status = 'failed', errors = $3 WHERE id = $1",
                 3, NULL, pvals, NULL, NULL, 0);
         } else {
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode=$2, status = 'completed', errors = $3 WHERE id = $1",
+                "statuscode=$2, status = 'completed', statuscode='SUCCESS', errors = $3 WHERE id = $1",
                 3, NULL, pvals, NULL, NULL, 0);
 
         }
@@ -307,7 +355,8 @@ static void do_request(PGconn *c, int64_t rid) {
         root = json_loads(octstr_get_cstr(resp), 0, &error);
         if (!root) {
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode = 'ERROR4', status = 'failed' WHERE id = $1",
+                "statuscode = 'ERROR4', errors = 'Response was not proper JSON', "
+                "status = 'failed' WHERE id = $1",
                 1, NULL, pvals, NULL, NULL, 0);
             PQclear(r);
             goto done;
@@ -316,7 +365,8 @@ static void do_request(PGconn *c, int64_t rid) {
         if (!json_is_string(status)) {
             info(0, "Failed to parse JSON reposne: (status).");
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode = 'ERROR5',status = 'failed' WHERE id = $1",
+                "statuscode = 'ERROR5', errors= 'Could not pick status from JSON response',"
+                "status = 'failed' WHERE id = $1",
                 1, NULL, pvals, NULL, NULL, 0);
             PQclear(r);
             json_decref(root);
@@ -329,14 +379,15 @@ static void do_request(PGconn *c, int64_t rid) {
         if (!json_is_string(descr)) {
             info(0, "Failed to parse JSON reposne: (description).");
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "
-                "statuscode = 'ERROR6',status = 'failed' WHERE id = $1",
+                "statuscode = 'ERROR6', errors = 'No description field in JSON response',"
+                "status = 'failed' WHERE id = $1",
                 1, NULL, pvals, NULL, NULL, 0);
             PQclear(r);
             json_decref(root);
             goto done;
         }
         description = json_string_value(descr);
-        sprintf(buf, description);
+        sprintf(buf, "%s", description);
 
         if (strcasecmp(status_text, "ERROR") == 0) {
             r = PQexecParams(c, "UPDATE requests SET updated = timeofday()::timestamp, "

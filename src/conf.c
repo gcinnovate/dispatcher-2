@@ -91,6 +91,10 @@ static int conf_init(dispatcher2conf_t config)
     snprintf(config->logdir, sizeof config->logdir, "/var/log");
     snprintf(config->default_queue_status,
             sizeof config->default_queue_status, "pending");
+    snprintf(config->sendsmsurl,
+            sizeof config->sendsmsurl, "http://localhost:13013/cgi-bin/sendsms?");
+    snprintf(config->default_sender,
+            sizeof config->default_sender, "6767");
 
     mygethostname(config->myhostname, sizeof config->myhostname);
 
@@ -137,6 +141,9 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
                 else if (strcasecmp(field, "default-queue-status") == 0)
                     snprintf(config->default_queue_status,
                             sizeof config->default_queue_status,"%s", value);
+                else if (strcasecmp(field, "default-sender") == 0)
+                    snprintf(config->default_sender,
+                            sizeof config->default_sender,"%s", value);
                 break;
             case 'e':
                 if (strcasecmp(field, "end-submission-period") == 0)
@@ -172,6 +179,9 @@ int parse_conf(FILE *f, dispatcher2conf_t config)
             case 's':
                 if (strcasecmp(field, "start-submission-period") == 0)
                     config->start_submission_period = atoi(value);
+                else if (strcasecmp(field, "sendsms-url") == 0)
+                    snprintf(config->sendsmsurl,
+                            sizeof config->sendsmsurl, "%s", value);
 #ifdef HAVE_LIBSSL
                 else if (strcasecmp(field, "ssl-client-certkey-file") == 0)
                     ssl_client_certfile = octstr_create(value);

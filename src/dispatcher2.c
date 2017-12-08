@@ -97,6 +97,62 @@ static int supporteduri(Octstr *);
 static void dispatch_processor(void *data);
 static void dispatch_request(struct HTTPData *x);
 
+static const char *sendsms(List *rh, struct HTTPData *x, Octstr *rbody, int *status)
+{
+    Octstr *user = http_cgi_variable(x->cgivars, "username");
+    Octstr *pass = http_cgi_variable(x->cgivars, "password");
+    Octstr *from = http_cgi_variable(x->cgivars, "from");
+    Octstr *to = http_cgi_variable(x->cgivars, "to");
+    Octstr *text = http_cgi_variable(x->cgivars, "text");
+    Octstr *furl = NULL, *sms_url = NULL, *resp_body = NULL;
+    int xs = -1; /* status returned after call*/
+
+    List *request_headers;
+    HTTPCaller * caller = http_caller_create();
+    int method = HTTP_METHOD_GET;
+
+    /*Use Basic Auth or GCI username and password to authenticate request*/
+    http_header_add(rh, "Content-Type", "text/plain");
+    if (ba_auth_user(x->dbconn, x->reqh) != 0  &&
+            auth_user(x->dbconn, user ? octstr_get_cstr(user): "",
+                pass ? octstr_get_cstr(pass): "") != 0) {
+        *status = HTTP_UNAUTHORIZED;
+        octstr_format_append(rbody, "error: ERR001: auth failed, user=%S", user);
+        info(0, "Error: 0001 auth failed, user=%s", octstr_get_cstr(user));
+        return "";
+    } else if (x->dbconn == NULL) {
+        *status = HTTP_INTERNAL_SERVER_ERROR;
+        octstr_append_cstr(rbody, "ERR002: Database not connected.");
+        info(0, "Error: 0002");
+        return "";
+    }
+
+    request_headers = http_create_empty_headers();
+    http_header_add(request_headers, "Content-Type", "text/plain; charset=us-ascii");
+    sms_url = octstr_format("%s%stext=%E&to=%E&from=%E",
+            config.sendsmsurl,
+            strchr(config.sendsmsurl, '?') != NULL ? "&" : "?",
+            text, to,
+            (from == NULL) ? octstr_format("%s",config.default_sender) : from);
+    http_start_request(caller, method, sms_url, request_headers, NULL, 1, NULL, NULL);
+
+    http_receive_result_real(caller, &xs, &furl, &request_headers, &resp_body, 1);
+
+    http_caller_destroy(caller);
+    http_destroy_headers(request_headers);
+    octstr_destroy(furl);
+    *status = http_status_class(xs) == HTTP_STATUS_SUCCESSFUL ?  HTTP_OK : xs;
+    if (*status = HTTP_OK) {
+        octstr_format_append(rbody, "Accepted!");
+        info(0, "Successfully called SMS URL [%s]", octstr_get_cstr(sms_url));
+        if(resp_body)
+            octstr_destroy(resp_body);
+    }
+    octstr_destroy(sms_url);
+
+    return "";
+}
+
 static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, int *status)
 {
     request_t *req;
@@ -119,6 +175,7 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     Octstr *week = http_cgi_variable(x->cgivars, "week");
     Octstr *month = http_cgi_variable(x->cgivars, "month");
     Octstr *year = http_cgi_variable(x->cgivars, "year");
+    Octstr *is_qparams = http_cgi_variable(x->cgivars, "is_qparams");
     Octstr *msisdn = http_cgi_variable(x->cgivars, "msisdn");
     Octstr *raw_msg = http_cgi_variable(x->cgivars, "raw_msg");
     Octstr *facility = http_cgi_variable(x->cgivars, "facility");
@@ -145,6 +202,8 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
 
     } else if (ctype && octstr_case_search(ctype, octstr_imm("json"), 0) >= 0) {
         ct = octstr_imm("json");
+    } else {
+        ct = octstr_imm("text");
     }
 
     info(0, "Creating Request with ctype:%s", octstr_get_cstr(ctype));
@@ -157,6 +216,7 @@ static const char *queue_request(List *rh, struct HTTPData *x, Octstr *rbody, in
     req->week = octstr_duplicate(week);
     req->msgid = (msgid) ? strtoull(octstr_get_cstr(msgid), NULL, 10) : -1;
     req->year = (year) ? strtoul(octstr_get_cstr(year), NULL, 10) : 0;
+    req->is_qparams = octstr_duplicate(is_qparams);
     req->payload = octstr_duplicate(x->body);
     req->ctype = octstr_duplicate(ct);
     req->msisdn = octstr_duplicate(msisdn);
@@ -186,7 +246,8 @@ static struct {
 
 } uri_funcs[] = {
     {TEST_URL, NULL},
-    {"/queue", queue_request}
+    {"/queue", queue_request},
+    {"/sendsms", sendsms}
 };
 
 static void quit_now(int unused)

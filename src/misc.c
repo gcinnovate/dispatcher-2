@@ -106,9 +106,9 @@ int64_t save_request(PGconn *c, request_t *req, dispatcher2conf_t config)
     char buf3[128];
     char buf4[128];
 
-    const char *pvals[15];
-    int plens[15] = {0};
-    int pfrmt[15] = {0};
+    const char *pvals[16];
+    int plens[16] = {0};
+    int pfrmt[16] = {0};
     int64_t xid = -1;
 
     sprintf(buf1, "%d", req->source);
@@ -135,14 +135,15 @@ int64_t save_request(PGconn *c, request_t *req, dispatcher2conf_t config)
     pvals[10] = req->facility ? octstr_get_cstr(req->facility) : "";
     pvals[11] = req->district ? octstr_get_cstr(req->district) : "";
     pvals[12] = req->report_type ? octstr_get_cstr(req->report_type) : "";
-    pvals[13] = config->default_queue_status ? config->default_queue_status : "status";
+    pvals[13] = config->default_queue_status ? config->default_queue_status : "ready";
+    pvals[14] = req->is_qparams ? octstr_get_cstr(req->is_qparams) : "f";
 
     PGresult *r;
     r = PQexecParams(c,
             "INSERT INTO requests(source, destination, body, ctype, submissionid, week,"
-            "month, year, msisdn, raw_msg, facility, district, report_type, status) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id",
-            14, NULL, pvals, plens, pfrmt, 0);
+            "month, year, msisdn, raw_msg, facility, district, report_type, status, body_is_query_param) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id",
+            15, NULL, pvals, plens, pfrmt, 0);
 
     if (PQresultStatus(r) != PGRES_TUPLES_OK || PQntuples(r) < 1) {
         error(0, "save_reuest: %s", PQresultErrorMessage(r));

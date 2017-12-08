@@ -27,6 +27,8 @@ struct dispatcher2conf {
     int start_submission_period;
     int end_submission_period;
     char default_queue_status[128];
+    char sendsmsurl[512];
+    char default_sender[128];
 };
 
 typedef struct dispatcher2conf *dispatcher2conf_t;

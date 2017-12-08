@@ -30,7 +30,9 @@ typedef struct serverconf_t {
     Octstr *ipaddress;
     Octstr *url;
     Octstr *auth_method;
+    Octstr *http_method;
     int use_ssl;
+    int parse_responses;
     Octstr *ssl_client_certkey_file;
     int start_submission_period;
     int end_submission_period;
