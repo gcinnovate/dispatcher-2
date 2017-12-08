@@ -45,10 +45,16 @@ for r in rs:
 
 ourServers = []
 serversById = {}
+serverApps = {}
 rs = db.query("SELECT id, name FROM servers order BY name")
 for r in rs:
     serversById[r['id']] = r['name']
     ourServers.append({'id': r['id'], 'name': r['name']})
+    x = db.query(
+        "SELECT allowed_sources FROM server_allowed_sources WHERE server_id=$id",
+        {'id': r['id']})
+    if x:
+        serverApps[r['id']] = x[0]['allowed_sources']
 
 
 def put_app(app):
@@ -71,8 +77,24 @@ def datetimeformat(value, fmt='%Y-%m-%d'):
         return ''
     return value.strftime(fmt)
 
+
+def server_apps(val):
+    ret = "<ul>"
+    if val not in serverApps or not serverApps[val]:
+        x = db.query(
+            "SELECT allowed_sources FROM server_allowed_sources WHERE server_id = $id", {'id': val})
+        if x:
+            serverApps[val] = x[0]['allowed_sources']
+    if val in serverApps:
+        for i in serverApps[val]:
+            ret += "<li>%s</li>" % serversById[i]
+
+    ret += "</ul>"
+    return ret
+
 myFilters = {
     'datetimeformat': datetimeformat,
+    'server_apps': server_apps
 }
 
 # Jinja2 Template options

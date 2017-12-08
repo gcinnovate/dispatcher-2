@@ -5,7 +5,7 @@ class handlers.
 """
 
 from app.controllers.main_handler import Index, Logout
-from app.controllers.api import RequestDetails, DeleteServer, DeleteRequest
+from app.controllers.api import RequestDetails, DeleteServer, DeleteRequest, ServerDetails
 from app.controllers.users_handler import Users
 from app.controllers.groups_handler import Groups
 from app.controllers.dashboard_handler import Dashboard
@@ -39,6 +39,7 @@ URLS = (
     r'/appsettings', AppSettings,
     # API stuff follows
     r'/api/v1/request_details/(\d+)/?', RequestDetails,
+    r'/api/v1/server_details/(\d+)/?', ServerDetails,
     r'/api/v1/server_del/(\d+)/?', DeleteServer,
     r'/api/v1/request_del/(\d+)/?', DeleteRequest,
 )

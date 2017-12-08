@@ -28,9 +28,9 @@
                 <div class="ibox-title">
                     <h5>Requests</h5>
                     <div class="ibox-tools">
-                        <button class="btn btn-info delete_btn" id="yy"><i class="fa fa-repeat"></i> Retry Selected</button>
+                        <button class="btn btn-info retry_btn" name="abtn" value="Retry Selected"><i class="fa fa-repeat"></i> Retry Selected</button>
                         &nbsp;&nbsp;&nbsp;
-                        <button class="btn btn-danger delete_btn" id="yy"><i class="fa fa-thumbs-o-down"></i> Cancel Selected</button>
+                        <button class="btn btn-danger cancel_btn" name="abtn" value="Cancel Selected"><i class="fa fa-thumbs-o-down"></i> Cancel Selected</button>
                         <a class="collapse-link">
                             <i class="fa fa-chevron-up"></i>
                         </a>
@@ -54,7 +54,7 @@
 							{% for l in res %}
 								<tr>
 									<td><input name="reqid" class="topromote" value="{{ l.id }}" type="checkbox"/></td>
-									<td>{{ l.facility }}</td>
+									<td>{{ l.facility}}</td>
 									<td>{{ l.msisdn }}</td>
 									<td>{{ l.raw_msg}}</td>
 									<td>{{ l.year|string + "W" + l.week}}</td>
@@ -154,6 +154,7 @@
                         }
                     });
             });
+
 			$('#mydata').DataTable({
                     dom: 'Bfrtip',
                     buttons: [

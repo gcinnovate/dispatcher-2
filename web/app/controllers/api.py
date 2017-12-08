@@ -1,6 +1,6 @@
 import json
 import web
-from . import db, get_current_week
+from . import db, get_current_week, server_apps
 from app.tools.utils import get_basic_auth_credentials, auth_user
 
 
@@ -80,6 +80,31 @@ class RequestDetails:
             else:
                 html_str += "<tr><td>Body</td><td><pre class='language-js'>"
                 html_str += "<code class='language-js'>%s<code></pre></td></tr>" % ret['body']
+
+        html_str += "</tbody></table>"
+        return html_str
+
+
+class ServerDetails:
+    def GET(self, server_id):
+        rs = db.query("SELECT * FROM servers WHERE id = $server_id", {'server_id': server_id})
+        html_str = '<table class="table table-striped table-bordered table-hover">'
+        html_str += "<thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>"
+
+        if rs:
+            ret = rs[0]
+            html_str += "<tr><td>Name</td><td>%s</td></tr>" % ret['name']
+            html_str += "<tr><td>Username</td><td>%s</td></tr>" % ret['username']
+            html_str += "<tr><td>Password</td><td>%s</td></tr>" % ret['password']
+            html_str += "<tr><td>Data Endpoint</td><td>%s</td></tr>" % ret['url']
+            html_str += "<tr><td>Authentication Method</td><td>%s</td></tr>" % ret['auth_method']
+            html_str += "<tr><td>Allowed Apps/Sources</td><td>%s</td></tr>" % server_apps(ret['id'])
+            html_str += "<tr><td>Start of Submission Period</td><td>%s</td></tr>" % ret['start_submission_period']
+            html_str += "<tr><td>End of Submission Period</td><td>%s</td></tr>" % ret['end_submission_period']
+            html_str += "<tr><td>XML Response Status XPath</td><td>%s</td></tr>" % ret['xml_response_xpath']
+            html_str += "<tr><td>JSON Response Status Path</td><td>%s</td></tr>" % ret['json_response_xpath']
+            html_str += "<tr><td>Use SSL?</td><td>%s</td></tr>" % ret['use_ssl']
+            html_str += "<tr><td>SSL Client CertKey File Path</td><td>%s</td></tr>" % ret['ssl_client_certkey_file']
 
         html_str += "</tbody></table>"
         return html_str

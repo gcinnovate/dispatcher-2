@@ -1,7 +1,7 @@
 import web
-from . import db, require_login, render
+from . import db, require_login, render, get_session
 from app.tools.pagination2 import doquery, countquery, getPaginationString
-from app.tools.utils import default, lit
+from app.tools.utils import default, lit, audit_log
 from settings import PAGE_LIMIT
 
 
@@ -32,6 +32,8 @@ class Ready:
 
     @require_login
     def POST(self):
+        session = get_session()
+        username = session.username
         params = web.input(page=1, reqid=[])
         try:
             page = int(params.page)
@@ -44,9 +46,17 @@ class Ready:
             if params.abtn == 'Cancel Selected':
                 if params.reqid:
                     for val in params.reqid:
-                        db.update('requests', where="id = %s" % val, status='canceled')
-
-            db.transaction().commit()
+                        db.update(
+                            'requests', where="id = %s" % val, status='canceled', updated='NOW()')
+                    log_dict = {
+                        'logtype': 'Web', 'action': 'Cancel Requests', 'actor': username,
+                        'ip': web.ctx['ip'],
+                        'descr': 'User %s canceled %s request(s)' % (username, len(params.reqid)),
+                        'user': session.sesid
+                    }
+                    audit_log(db, log_dict)
+                db.transaction().commit()
+                return web.seeother("/ready")
         dic = lit(
             relations='requests', fields="*",
             criteria="status='ready'",

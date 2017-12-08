@@ -135,7 +135,7 @@
                     function (isConfirm) {
                         if (isConfirm) {
                             $.get(
-                                '/api/v1/request_del/' + del_id,
+                                '/api/v1/requests_del/' + del_id,
                                 {d_id: del_id, caller: 'api'},
                                 function(data){
                                     if (data.message == "success"){

@@ -60,6 +60,8 @@ class Search:
                 if params.reqid:
                     for val in params.reqid:
                         db.update('requests', where="id = %s" % val, status='canceled')
+            if params.pbtn == 'Cancel Selected':
+                session.criteria = "TRUE "
             db.transaction().commit()
 
         criteria = "TRUE "
@@ -83,7 +85,7 @@ class Search:
             criteria += " AND facility = '%s'" % params.facility
         if params.formatting:
             if params.formatting == "xml":
-                criteria += " AND xml_is_well_formed(body)"
+                criteria += " AND xml_is_well_formed_document(body)"
 
         print criteria
         if len(criteria) > 5:
